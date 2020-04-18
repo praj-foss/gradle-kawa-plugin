@@ -13,6 +13,7 @@ import org.gradle.api.Plugin
  */
 class KawaPlugin: Plugin<Project> {
     lateinit var project: Project
+    lateinit var extension: KawaExtension
 
     override fun apply(project: Project) {
         this.project = project
@@ -22,10 +23,14 @@ class KawaPlugin: Plugin<Project> {
     }
 
     private fun configureExtensions() {
-        project.extensions.create("kawa", KawaExtension::class.java, project)
+        extension = project.extensions.create("kawa", KawaExtension::class.java, project)
     }
 
     private fun configureTasks() {
-        project.tasks.register("downloadToolsKawa", KawaDownloadTools::class.java)
+        val downloadToolsKawa = project.tasks.create(
+                "downloadToolsKawa", KawaDownloadTools::class.java, extension)
+        val configureToolsKawa = project.tasks.create(
+                "configureToolsKawa", KawaConfigureTools::class.java, extension, downloadToolsKawa)
+        configureToolsKawa.dependsOn(downloadToolsKawa)
     }
 }

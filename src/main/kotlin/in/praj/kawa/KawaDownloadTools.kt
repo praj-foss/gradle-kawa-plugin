@@ -16,20 +16,22 @@ import org.gradle.api.tasks.TaskAction
 import java.net.URL
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
+import javax.inject.Inject
 
 /**
  * Task to download Kawa tools.
  */
-open class KawaDownloadTools : DefaultTask() {
+open class KawaDownloadTools @Inject constructor(
+        extension: KawaExtension
+) : DefaultTask() {
     @Input
-    val version: Property<String> = project.extensions.getByType(KawaExtension::class.java).version
+    val version: Property<String> = extension.version
 
     @Internal
     val tarballName: Provider<String> = version.map { "kawa-${it}.tar.gz" }
 
     @OutputFile
-    val tarball: Provider<RegularFile> =
-            tarballName.map { project.layout.buildDirectory.get().dir("kawa").file(it) }
+    val tarball: Provider<RegularFile> = extension.kawaBuildDir.map { it.file(tarballName.get()) }
 
     @TaskAction
     fun perform() {
