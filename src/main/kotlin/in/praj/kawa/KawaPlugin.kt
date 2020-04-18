@@ -9,7 +9,7 @@ import org.gradle.api.Project
 import org.gradle.api.Plugin
 
 /**
- * Plugin to set up Kawa Scheme projects.
+ * Plugin to set up Kawa projects.
  */
 class KawaPlugin: Plugin<Project> {
     lateinit var project: Project
@@ -26,6 +26,6 @@ class KawaPlugin: Plugin<Project> {
     }
 
     private fun configureTasks() {
-        project.tasks.create("downloadToolsKawa", KawaDownloadTools::class.java)
+        project.tasks.register("downloadToolsKawa", KawaDownloadTools::class.java)
     }
 }

@@ -9,7 +9,7 @@ import org.gradle.api.Project
 import org.gradle.api.provider.Property
 
 /**
- * Configuration options for the kawa plugin.
+ * Configuration options for the Kawa plugin.
  */
 open class KawaExtension(
         project: Project
