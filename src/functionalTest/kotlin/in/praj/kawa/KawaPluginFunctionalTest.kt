@@ -51,6 +51,6 @@ class KawaPluginFunctionalTest {
                 .withArguments("downloadToolsKawa")
                 .withProjectDir(projectDir)
                 .build()
-        assert(result.output.contains("Downloaded Kawa 1.10"))
+        assert(result.output.contains("Downloaded kawa-1.10.tar.gz"))
     }
 }

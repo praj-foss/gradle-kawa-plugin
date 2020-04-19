@@ -17,5 +17,5 @@ open class KawaExtension(
         project: Project
 ) {
     val version: Property<String> = project.objects.property(String::class.java)
-    val kawaBuildDir: Provider<Directory> = project.layout.buildDirectory.map { it.dir("kawa") }
+    val kawaBuildDir: Provider<Directory> = project.layout.buildDirectory.dir("kawa")
 }
