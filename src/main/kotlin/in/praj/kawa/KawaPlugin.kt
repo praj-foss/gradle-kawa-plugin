@@ -5,12 +5,18 @@
 
 package `in`.praj.kawa
 
-import org.gradle.api.Project
 import org.gradle.api.Plugin
+import org.gradle.api.Project
+import org.gradle.api.Task
 
 /**
  * Plugin to set up Kawa projects.
  */
+
+const val KAWA_EXTENSION_NAME  = "kawa"
+const val DOWNLOAD_TOOLS_TASK  = "downloadToolsKawa"
+const val CONFIGURE_TOOLS_TASK = "configureToolsKawa"
+
 class KawaPlugin: Plugin<Project> {
     lateinit var project: Project
     lateinit var extension: KawaExtension
@@ -18,19 +24,29 @@ class KawaPlugin: Plugin<Project> {
     override fun apply(project: Project) {
         this.project = project
 
-        configureExtensions()
-        configureTasks()
+        setupExtensions()
+        setupTasks()
+        applyConventions()
     }
 
-    private fun configureExtensions() {
-        extension = project.extensions.create("kawa", KawaExtension::class.java, project)
+    private fun setupExtensions() {
+        extension = project.extensions.create(KAWA_EXTENSION_NAME, KawaExtension::class.java)
     }
 
-    private fun configureTasks() {
-        val downloadToolsKawa = project.tasks.create(
-                "downloadToolsKawa", KawaDownloadTools::class.java, extension)
-        val configureToolsKawa = project.tasks.create(
-                "configureToolsKawa", KawaConfigureTools::class.java, extension, downloadToolsKawa)
-        configureToolsKawa.dependsOn(downloadToolsKawa)
+    private fun setupTasks() {
+        val dtk = register<KawaDownloadTools>(DOWNLOAD_TOOLS_TASK)
+
+        register<KawaConfigureTools>(CONFIGURE_TOOLS_TASK)
+                .configure { it.dependsOn(dtk) }
     }
+
+    private fun applyConventions() {
+        extension.apply {
+            version.set("3.1.1")
+            kawaBuildDir.set(project.buildDir.resolve("kawa"))
+        }
+    }
+
+    private inline fun <reified T : Task> register(name: String) =
+            project.tasks.register(name, T::class.java, extension)
 }

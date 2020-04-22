@@ -5,17 +5,17 @@
 
 package `in`.praj.kawa
 
-import org.gradle.api.Project
-import org.gradle.api.file.Directory
+import org.gradle.api.file.DirectoryProperty
+import org.gradle.api.model.ObjectFactory
 import org.gradle.api.provider.Property
-import org.gradle.api.provider.Provider
+import javax.inject.Inject
 
 /**
  * Configuration options for the Kawa plugin.
  */
-open class KawaExtension(
-        project: Project
+open class KawaExtension @Inject constructor(
+        objects: ObjectFactory
 ) {
-    val version: Property<String> = project.objects.property(String::class.java)
-    val kawaBuildDir: Provider<Directory> = project.layout.buildDirectory.dir("kawa")
+    val version: Property<String> = objects.property(String::class.java)
+    val kawaBuildDir: DirectoryProperty = objects.directoryProperty()
 }
