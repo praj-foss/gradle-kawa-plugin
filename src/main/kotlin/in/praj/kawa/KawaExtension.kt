@@ -11,6 +11,6 @@ package `in`.praj.kawa
  * build script.
  */
 interface KawaExtension {
-    var version: String
-    var cacheDir: Any
+    var version: String?
+    var cacheDir: Any?
 }

@@ -14,7 +14,6 @@ import org.gradle.api.Task
 /**
  * Plugin to set up Kawa projects.
  */
-
 class KawaPlugin: Plugin<Project> {
     private lateinit var project: Project
     private lateinit var settings: KawaSettings
@@ -28,22 +27,24 @@ class KawaPlugin: Plugin<Project> {
 
     private fun setupExtensions() {
         val extension = project.extensions.create(KAWA_EXTENSION, KawaExtension::class.java)
-        settings = KawaSettings(project, extension)
+        project.afterEvaluate {
+            settings = KawaSettings(project, extension)
+        }
     }
 
     private fun setupTasks() {
         val downloadKawa  = register<KawaDownload>(DOWNLOAD_TASK)
         downloadKawa.configure {
-            it.version.set(settings.version())
-            it.outFile.set(settings.sourceFile())
+            it.version.set(settings.version)
+            it.outFile.set(settings.sourceTar)
         }
 
         val configureKawa = register<KawaConfigure>(CONFIGURE_TASK)
         configureKawa.configure {
             it.dependsOn(downloadKawa)
-            it.version.set(settings.version())
-            it.source.set(settings.sourceFile())
-            it.distDir.set(settings.distDir())
+            it.version.set(settings.version)
+            it.sourceTar.set(settings.sourceTar)
+            it.distDir.set(settings.distDir)
         }
     }
 

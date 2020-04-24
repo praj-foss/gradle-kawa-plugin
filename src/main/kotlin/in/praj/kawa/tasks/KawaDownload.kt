@@ -18,7 +18,7 @@ import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 
 /**
- * Task to download Kawa sources.
+ * Task to download Kawa toolchain sources.
  */
 abstract class KawaDownload : DefaultTask() {
     @get:Input

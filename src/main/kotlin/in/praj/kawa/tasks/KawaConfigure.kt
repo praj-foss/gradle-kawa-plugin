@@ -19,24 +19,23 @@ import org.gradle.api.tasks.Internal
 import org.gradle.api.tasks.OutputDirectory
 import org.gradle.api.tasks.TaskAction
 import java.io.File
-import java.nio.file.Files
 import java.util.Locale
 
 /**
- * Task to configure and build the downloaded Kawa sources.
+ * Task to configure and build Kawa toolchain.
  */
 abstract class KawaConfigure : DefaultTask() {
     @get:Input
     abstract val version: Property<String>
 
     @get:InputFile
-    abstract val source: RegularFileProperty
+    abstract val sourceTar: RegularFileProperty
 
     @get:OutputDirectory
     abstract val distDir: DirectoryProperty
 
     @Internal
-    protected val baseDir: Provider<File> = source.asFile
+    protected val baseDir: Provider<File> = sourceTar.asFile
             .map { it.resolveSibling("kawa-${version.get()}") }
 
     @Internal
@@ -54,7 +53,7 @@ abstract class KawaConfigure : DefaultTask() {
                 throw GradleException("Directory could not be deleted: ${it.absolutePath}")
         }
 
-        source.get().asFile.let { tar ->
+        sourceTar.get().asFile.let { tar ->
             project.copy { it
                     .from(project.tarTree(tar))
                     .into(tar.parentFile) }
@@ -68,7 +67,7 @@ abstract class KawaConfigure : DefaultTask() {
         buildCore()
         buildLib()
         buildSlib()
-        generateJar()
+        generateJars()
     }
 
     private fun buildTools() {
@@ -386,25 +385,26 @@ abstract class KawaConfigure : DefaultTask() {
         logger.debug("Built Kawa slib")
     }
 
-    private fun generateJar() {
+    private fun generateJars() {
         val ver = version.get()
         val src = baseDir.get()
         val classes = classDir.get()
         val tools = toolsDir.get()
         val out = distDir.get().asFile
-        val services = classes.resolve("META-INF/services")
 
+        val services = classes.resolve("META-INF/services")
         withAnt("mkdir", mapOf("dir" to services))
+
+        // Kawa core
         withAnt("echo", mapOf(
                 "message" to "kawa.standard.SchemeScriptEngineFactory #Scheme\n",
                 "append" to true,
                 "file" to services.resolve("javax.script.ScriptEngineFactory")
         ))
-
-        // Kawa core
         withAnt("jar", mapOf(
-                "jarfile" to out.resolve("kawa-${ver}.jar"),
-                "manifest" to src.resolve("jar-manifest")
+                "destfile" to out.resolve("kawa-${ver}.jar"),
+                "manifest" to src.resolve("jar-manifest"),
+                "update" to true
         )) {
             withAnt("fileset", mapOf("dir" to classes)) {
                 listOf(
@@ -416,7 +416,10 @@ abstract class KawaConfigure : DefaultTask() {
         }
 
         // Kawa Ant tools
-        withAnt("jar", mapOf("jarfile" to out.resolve("kawa-ant-${ver}.jar"))) {
+        withAnt("jar", mapOf(
+                "destfile" to out.resolve("kawa-ant-${ver}.jar"),
+                "update" to true
+        )) {
             withAnt("fileset", mapOf("dir" to tools)) {
                 withAnt("include", mapOf("name" to "gnu/kawa/ant/*.class"))
             }
