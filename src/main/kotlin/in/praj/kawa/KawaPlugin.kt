@@ -5,6 +5,8 @@
 
 package `in`.praj.kawa
 
+import `in`.praj.kawa.tasks.KawaConfigure
+import `in`.praj.kawa.tasks.KawaDownload
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.api.Task
@@ -13,40 +15,38 @@ import org.gradle.api.Task
  * Plugin to set up Kawa projects.
  */
 
-const val KAWA_EXTENSION_NAME  = "kawa"
-const val DOWNLOAD_TOOLS_TASK  = "downloadToolsKawa"
-const val CONFIGURE_TOOLS_TASK = "configureToolsKawa"
-
 class KawaPlugin: Plugin<Project> {
-    lateinit var project: Project
-    lateinit var extension: KawaExtension
+    private lateinit var project: Project
+    private lateinit var settings: KawaSettings
 
     override fun apply(project: Project) {
         this.project = project
 
         setupExtensions()
         setupTasks()
-        applyConventions()
     }
 
     private fun setupExtensions() {
-        extension = project.extensions.create(KAWA_EXTENSION_NAME, KawaExtension::class.java)
+        val extension = project.extensions.create(KAWA_EXTENSION, KawaExtension::class.java)
+        settings = KawaSettings(project, extension)
     }
 
     private fun setupTasks() {
-        val dtk = register<KawaDownloadTools>(DOWNLOAD_TOOLS_TASK)
+        val downloadKawa  = register<KawaDownload>(DOWNLOAD_TASK)
+        downloadKawa.configure {
+            it.version.set(settings.version())
+            it.outFile.set(settings.sourceFile())
+        }
 
-        register<KawaConfigureTools>(CONFIGURE_TOOLS_TASK)
-                .configure { it.dependsOn(dtk) }
-    }
-
-    private fun applyConventions() {
-        extension.apply {
-            version.set("3.1.1")
-            kawaBuildDir.set(project.buildDir.resolve("kawa"))
+        val configureKawa = register<KawaConfigure>(CONFIGURE_TASK)
+        configureKawa.configure {
+            it.dependsOn(downloadKawa)
+            it.version.set(settings.version())
+            it.source.set(settings.sourceFile())
+            it.distDir.set(settings.distDir())
         }
     }
 
     private inline fun <reified T : Task> register(name: String) =
-            project.tasks.register(name, T::class.java, extension)
+            project.tasks.register(name, T::class.java)
 }

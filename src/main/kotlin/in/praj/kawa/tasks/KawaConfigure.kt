@@ -3,59 +3,82 @@
  * See the LICENSE file in project root for details.
  */
 
-package `in`.praj.kawa
+package `in`.praj.kawa.tasks
 
 import groovy.lang.Closure
 import org.apache.tools.ant.PropertyHelper
-import org.gradle.api.AntBuilder
 import org.gradle.api.DefaultTask
+import org.gradle.api.GradleException
+import org.gradle.api.file.DirectoryProperty
+import org.gradle.api.file.RegularFileProperty
+import org.gradle.api.provider.Property
 import org.gradle.api.provider.Provider
+import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.InputFile
+import org.gradle.api.tasks.Internal
 import org.gradle.api.tasks.OutputDirectory
 import org.gradle.api.tasks.TaskAction
 import java.io.File
+import java.nio.file.Files
 import java.util.Locale
-import javax.inject.Inject
 
 /**
- * Task to configure and build the downloaded Kawa tools.
+ * Task to configure and build the downloaded Kawa sources.
  */
-open class KawaConfigureTools @Inject constructor(
-        private val extension: KawaExtension
-) : DefaultTask() {
-    @InputFile
-    val buildXml: Provider<File> = extension.kawaBuildDir
-            .map { it.dir("kawa-${extension.version.get()}").file("build.xml").asFile }
+abstract class KawaConfigure : DefaultTask() {
+    @get:Input
+    abstract val version: Property<String>
 
-    @OutputDirectory
-    val kawaDist: Provider<File> = buildXml.map { it.resolveSibling("dist") }
+    @get:InputFile
+    abstract val source: RegularFileProperty
+
+    @get:OutputDirectory
+    abstract val distDir: DirectoryProperty
+
+    @Internal
+    protected val baseDir: Provider<File> = source.asFile
+            .map { it.resolveSibling("kawa-${version.get()}") }
+
+    @Internal
+    protected val toolsDir: Provider<File> = baseDir
+            .map { it.resolve("tools") }
+
+    @Internal
+    protected val classDir: Provider<File> = baseDir
+            .map { it.resolve("classes") }
 
     @TaskAction
     fun perform() {
-        ant.lifecycleLogLevel = AntBuilder.AntMessagePriority.VERBOSE
-        val buildXml = buildXml.get()
+        baseDir.get().let {
+            if (it.deleteRecursively().not())
+                throw GradleException("Directory could not be deleted: ${it.absolutePath}")
+        }
 
-        val baseDir = buildXml.parentFile
-        val toolsDir = baseDir.resolve("tools")
-        val kawaBuildDir = baseDir.resolve("classes")
-        val kawaDistDir = kawaDist.get()
-        ant.antProject.baseDir = baseDir
+        source.get().asFile.let { tar ->
+            project.copy { it
+                    .from(project.tarTree(tar))
+                    .into(tar.parentFile) }
+        }
+        logger.debug("Extracted Kawa sources")
 
-        buildTools(baseDir, toolsDir)
-        defineToolTasks(toolsDir)
-        preprocessClasses(baseDir)
-        generateSimpleVectorFiles(baseDir, toolsDir)
-        buildCore(baseDir, kawaBuildDir)
-        buildLib(baseDir, kawaBuildDir)
-        buildSlib(baseDir, kawaBuildDir)
-        generateJar(baseDir, kawaBuildDir, kawaDistDir)
+        buildTools()
+        defineAntTasks()
+        preprocessClasses()
+        generateVectorSources()
+        buildCore()
+        buildLib()
+        buildSlib()
+        generateJar()
     }
 
-    private fun buildTools(srcDir: File, destDir: File) {
-        withAnt("mkdir", mapOf("dir" to destDir))
+    private fun buildTools() {
+        val src  = baseDir.get()
+        val dest = toolsDir.get()
+
+        withAnt("mkdir", mapOf("dir" to dest))
         withAnt("javac", mapOf(
-                "srcdir"            to srcDir,
-                "destdir"           to destDir,
+                "srcdir"            to src,
+                "destdir"           to dest,
                 "includes"          to listOf(
                         "gnu/kawa/util/PreProcess.java",
                         "gnu/kawa/ant/*.java")
@@ -67,30 +90,34 @@ open class KawaConfigureTools @Inject constructor(
                 "fork"              to true,
                 "debug"             to true
         ))
-        println("\n===> Finished compiling Kawa tools")
+        logger.debug("Built Kawa Ant tools")
     }
 
-    private fun defineToolTasks(toolsDir: File) {
+    private fun defineAntTasks() {
+        val tools = toolsDir.get()
+
         withAnt("taskdef", mapOf(
                 "name"      to "kawac",
                 "classname" to "gnu.kawa.ant.Kawac",
-                "classpath" to toolsDir
+                "classpath" to tools
         ))
         withAnt("taskdef", mapOf(
                 "name"      to "xcopy",
                 "classname" to "gnu.kawa.ant.XCopy",
-                "classpath" to toolsDir
+                "classpath" to tools
         ))
+        logger.debug("Defined kawac and xcopy Ant tasks")
     }
 
-    private fun preprocessClasses(srcDir: File) {
-        withAnt("mkdir", mapOf("dir" to srcDir))
+    private fun preprocessClasses() {
+        val src = baseDir.get()
+        withAnt("mkdir", mapOf("dir" to src))
         withAnt("xcopy", mapOf(
-                "todir" to srcDir.resolve("kawa"),
+                "todir" to src.resolve("kawa"),
                 "overwrite" to false
         )) {
             withAnt("fileset", mapOf(
-                    "dir" to srcDir.resolve("kawa"),
+                    "dir" to src.resolve("kawa"),
                     "includes" to "*.java.in"))
             withAnt("mapper", mapOf(
                     "type" to "glob",
@@ -108,22 +135,25 @@ open class KawaConfigureTools @Inject constructor(
                     "endtoken" to "\"")) {
                 withAnt("filter", mapOf(
                         "token" to "VERSION",
-                        "value" to "\"${extension.version.get()}\""))
+                        "value" to "\"${version.get()}\""))
             }
         }
-        println("\n===> Finished preprocessing, with XCopy")
+        logger.debug("Finished preprocessing sources")
     }
 
-    private fun generateSimpleVectorFiles(srcDir: File, toolsDir: File) {
+    private fun generateVectorSources() {
+        val src = baseDir.get()
+        val tools = toolsDir.get()
+
         fun makePrimeVectorSource(tag: String, out: String) =
                 withAnt("java", mapOf("classname" to "gnu.kawa.util.PreProcess")) {
-                    withAnt("classpath", mapOf("location" to toolsDir))
+                    withAnt("classpath", mapOf("location" to tools))
                     listOf(
                             "%${tag}",
                             "%UniformVector",
                             "-o",
-                            srcDir.resolve("gnu/lists/${out}Vector.java"),
-                            srcDir.resolve("gnu/lists/PrimVector.template")
+                            src.resolve("gnu/lists/${out}Vector.java"),
+                            src.resolve("gnu/lists/PrimVector.template")
                     ).map { withAnt("arg", mapOf("value" to it)) }
                 }
 
@@ -135,11 +165,11 @@ open class KawaConfigureTools @Inject constructor(
         val upToDate = "simplevector-files-uptodate"
         withAnt("uptodate", mapOf("property" to upToDate)) {
             withAnt("srcfiles", mapOf(
-                    "file" to srcDir.resolve("gnu/lists/PrimVector.template")))
+                    "file" to src.resolve("gnu/lists/PrimVector.template")))
             withAnt("srcfiles", mapOf(
-                    "file" to toolsDir.resolve("gnu/kawa/util/PreProcess.class")))
+                    "file" to tools.resolve("gnu/kawa/util/PreProcess.class")))
             withAnt("compositemapper") {
-                vectorTypes.map { srcDir.resolve("gnu/lists/${it}Vector.java") }
+                vectorTypes.map { src.resolve("gnu/lists/${it}Vector.java") }
                         .map { withAnt("mergemapper", mapOf("to" to it)) }
             }
         }
@@ -150,14 +180,17 @@ open class KawaConfigureTools @Inject constructor(
             vectorTypes.drop(1)
                     .map { makePrimeVectorSource(it.toUpperCase(Locale.ENGLISH), it) }
         }
-        println("\n===> Finished generating Vector files")
+        logger.debug("Generated Vector sources")
     }
 
-    private fun buildCore(srcDir: File, buildDir: File) {
-        withAnt("mkdir", mapOf("dir" to buildDir))
+    private fun buildCore() {
+        val src = baseDir.get()
+        val classes = classDir.get()
+
+        withAnt("mkdir", mapOf("dir" to classes))
         withAnt("javac", mapOf(
-                "srcdir"            to srcDir,
-                "destdir"           to buildDir,
+                "srcdir"            to src,
+                "destdir"           to classes,
                 "includeantruntime" to false,
                 "optimize"          to true,
                 "deprecation"       to false,
@@ -189,19 +222,22 @@ open class KawaConfigureTools @Inject constructor(
                     "gnu/kawa/models/"
             ).map { withAnt("include", mapOf("name" to it)) }
         }
-        println("\n===> Built Kawa core")
+        logger.debug("Built Kawa core")
     }
 
-    private fun buildLib(srcDir: File, buildDir: File) {
+    private fun buildLib() {
+        val src = baseDir.get()
+        val classes = classDir.get()
+
         withAnt("kawac", mapOf(
                 "failonerror" to true,
-                "destdir" to buildDir,
+                "destdir" to classes,
                 "prefix" to "kawa.lib.",
                 "modulestatic" to "run",
                 "language" to "scheme"
         )) {
             withAnt("arg", mapOf("line" to "--warn-undefined-variable --warn-unknown-member --warn-as-error"))
-            withAnt("filelist", mapOf("dir" to srcDir.resolve("kawa/lib"))) {
+            withAnt("filelist", mapOf("dir" to src.resolve("kawa/lib"))) {
                 listOf(
                         "prim_imports.scm",
                         "prim_syntax.scm",
@@ -264,13 +300,13 @@ open class KawaConfigureTools @Inject constructor(
 
         withAnt("kawac", mapOf(
                 "failonerror" to true,
-                "destdir" to buildDir,
+                "destdir" to classes,
                 "prefix" to "kawa.lib.",
                 "modulestatic" to "run",
                 "language" to "scheme"
         )) {
             withAnt("arg", mapOf("line" to "--warn-undefined-variable --warn-unknown-member --warn-as-error"))
-            withAnt("filelist", mapOf("dir" to srcDir.resolve("kawa/lib"))) {
+            withAnt("filelist", mapOf("dir" to src.resolve("kawa/lib"))) {
                 listOf(
                         "enums.scm",
                         "srfi/8.scm",
@@ -290,13 +326,13 @@ open class KawaConfigureTools @Inject constructor(
 
         withAnt("kawac", mapOf(
                 "failonerror" to true,
-                "destdir" to buildDir,
+                "destdir" to classes,
                 "prefix" to "kawa.lib.",
                 "modulestatic" to "run",
                 "language" to "scheme"
         )) {
             withAnt("arg", mapOf("line" to "--warn-undefined-variable --warn-unknown-member --warn-as-error"))
-            withAnt("filelist", mapOf("dir" to srcDir.resolve("kawa/lib"))) {
+            withAnt("filelist", mapOf("dir" to src.resolve("kawa/lib"))) {
                 listOf(
                         "kawa/quaternions.scm",
                         "kawa/pprint.scm",
@@ -306,18 +342,21 @@ open class KawaConfigureTools @Inject constructor(
                 ).map { withAnt("file", mapOf("name" to it)) }
             }
         }
-        println("\n===> Built Kawa lib")
+        logger.debug("Built Kawa lib")
     }
 
-    private fun buildSlib(srcDir: File, buildDir: File) {
+    private fun buildSlib() {
+        val src = baseDir.get()
+        val classes = classDir.get()
+
         withAnt("kawac", mapOf(
                 "failonerror" to true,
-                "destdir" to buildDir,
+                "destdir" to classes,
                 "prefix" to "gnu.kawa.slib.",
                 "modulestatic" to "run",
                 "language" to "scheme"
         )) {
-            withAnt("filelist", mapOf("dir" to srcDir.resolve("gnu/kawa/slib"))) {
+            withAnt("filelist", mapOf("dir" to src.resolve("gnu/kawa/slib"))) {
                 listOf(
                         "readtable.scm",
                         "srfi1.scm",
@@ -344,22 +383,30 @@ open class KawaConfigureTools @Inject constructor(
                 ).map { withAnt("file", mapOf("name" to it)) }
             }
         }
-        println("\n===> Built Kawa slib")
+        logger.debug("Built Kawa slib")
     }
 
-    private fun generateJar(srcDir: File, buildDir: File, outDir: File) {
-        val services = buildDir.resolve("META-INF/services")
+    private fun generateJar() {
+        val ver = version.get()
+        val src = baseDir.get()
+        val classes = classDir.get()
+        val tools = toolsDir.get()
+        val out = distDir.get().asFile
+        val services = classes.resolve("META-INF/services")
+
         withAnt("mkdir", mapOf("dir" to services))
         withAnt("echo", mapOf(
                 "message" to "kawa.standard.SchemeScriptEngineFactory #Scheme\n",
                 "append" to true,
                 "file" to services.resolve("javax.script.ScriptEngineFactory")
         ))
+
+        // Kawa core
         withAnt("jar", mapOf(
-                "jarfile" to outDir.resolve("kawa-${extension.version.get()}.jar"),
-                "manifest" to srcDir.resolve("jar-manifest")
+                "jarfile" to out.resolve("kawa-${ver}.jar"),
+                "manifest" to src.resolve("jar-manifest")
         )) {
-            withAnt("fileset", mapOf("dir" to buildDir)) {
+            withAnt("fileset", mapOf("dir" to classes)) {
                 listOf(
                         "gnu/**/*.class",
                         "kawa/**/*.class",
@@ -367,6 +414,14 @@ open class KawaConfigureTools @Inject constructor(
                 ).map { withAnt("include", mapOf("name" to it)) }
             }
         }
+
+        // Kawa Ant tools
+        withAnt("jar", mapOf("jarfile" to out.resolve("kawa-ant-${ver}.jar"))) {
+            withAnt("fileset", mapOf("dir" to tools)) {
+                withAnt("include", mapOf("name" to "gnu/kawa/ant/*.class"))
+            }
+        }
+        logger.debug("Generated Kawa jars")
     }
 
     private fun withAnt(
