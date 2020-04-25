@@ -5,8 +5,8 @@
 
 package `in`.praj.kawa.tasks
 
-import groovy.lang.Closure
 import org.apache.tools.ant.PropertyHelper
+import org.gradle.api.AntBuilder
 import org.gradle.api.DefaultTask
 import org.gradle.api.GradleException
 import org.gradle.api.file.DirectoryProperty
@@ -48,6 +48,8 @@ abstract class KawaConfigure : DefaultTask() {
 
     @TaskAction
     fun perform() {
+        ant.lifecycleLogLevel = AntBuilder.AntMessagePriority.WARN
+        
         baseDir.get().let {
             if (it.deleteRecursively().not())
                 throw GradleException("Directory could not be deleted: ${it.absolutePath}")
@@ -58,7 +60,7 @@ abstract class KawaConfigure : DefaultTask() {
                     .from(project.tarTree(tar))
                     .into(tar.parentFile) }
         }
-        logger.debug("Extracted Kawa sources")
+        logger.debug("Extracted toolchain sources")
 
         buildTools()
         defineAntTasks()
@@ -89,7 +91,7 @@ abstract class KawaConfigure : DefaultTask() {
                 "fork"              to true,
                 "debug"             to true
         ))
-        logger.debug("Built Kawa Ant tools")
+        logger.lifecycle("Built Ant tasks")
     }
 
     private fun defineAntTasks() {
@@ -105,7 +107,7 @@ abstract class KawaConfigure : DefaultTask() {
                 "classname" to "gnu.kawa.ant.XCopy",
                 "classpath" to tools
         ))
-        logger.debug("Defined kawac and xcopy Ant tasks")
+        logger.lifecycle("Defined kawac and xcopy Ant tasks")
     }
 
     private fun preprocessClasses() {
@@ -137,7 +139,7 @@ abstract class KawaConfigure : DefaultTask() {
                         "value" to "\"${version.get()}\""))
             }
         }
-        logger.debug("Finished preprocessing sources")
+        logger.lifecycle("Finished preprocessing sources")
     }
 
     private fun generateVectorSources() {
@@ -179,7 +181,7 @@ abstract class KawaConfigure : DefaultTask() {
             vectorTypes.drop(1)
                     .map { makePrimeVectorSource(it.toUpperCase(Locale.ENGLISH), it) }
         }
-        logger.debug("Generated Vector sources")
+        logger.lifecycle("Generated Vector sources")
     }
 
     private fun buildCore() {
@@ -221,7 +223,7 @@ abstract class KawaConfigure : DefaultTask() {
                     "gnu/kawa/models/"
             ).map { withAnt("include", mapOf("name" to it)) }
         }
-        logger.debug("Built Kawa core")
+        logger.lifecycle("Built Kawa core")
     }
 
     private fun buildLib() {
@@ -341,7 +343,7 @@ abstract class KawaConfigure : DefaultTask() {
                 ).map { withAnt("file", mapOf("name" to it)) }
             }
         }
-        logger.debug("Built Kawa lib")
+        logger.lifecycle("Built Kawa lib")
     }
 
     private fun buildSlib() {
@@ -382,7 +384,7 @@ abstract class KawaConfigure : DefaultTask() {
                 ).map { withAnt("file", mapOf("name" to it)) }
             }
         }
-        logger.debug("Built Kawa slib")
+        logger.lifecycle("Built Kawa slib")
     }
 
     private fun generateJars() {
@@ -424,25 +426,6 @@ abstract class KawaConfigure : DefaultTask() {
                 withAnt("include", mapOf("name" to "gnu/kawa/ant/*.class"))
             }
         }
-        logger.debug("Generated Kawa jars")
+        logger.lifecycle("Generated Kawa jars")
     }
-
-    private fun withAnt(
-            name: String,
-            props: Map<String, Any>? = null,
-            closure: (() -> Any)? = null
-    ) = if (props == null && closure == null)
-            ant.invokeMethod(name)
-        else if (closure == null)
-            ant.invokeMethod(name, props)
-        else {
-            object : Closure<Any?>(null) {
-                override fun call(vararg args: Any?): Any? {
-                    return closure.invoke()
-                }
-            }.let { ant.invokeMethod(name,
-                    if (props == null) it
-                    else arrayOf(props, it)
-            ) }
-        }
 }

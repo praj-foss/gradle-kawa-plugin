@@ -10,6 +10,8 @@ package `in`.praj.kawa
  */
 
 const val KAWA_EXTENSION = "kawa"
+const val KAWAC_EXTENSION = "kawac"
 
 const val DOWNLOAD_TASK  = "downloadKawa"
 const val CONFIGURE_TASK = "configureKawa"
+const val COMPILE_TASK   = "compileKawa"

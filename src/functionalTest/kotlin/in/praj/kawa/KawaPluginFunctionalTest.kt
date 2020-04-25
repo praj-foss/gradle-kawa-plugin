@@ -15,6 +15,7 @@ import java.io.File
 /**
  * A simple functional test for the 'in.praj.kawa' plugin.
  */
+// TODO: Fill these
 class KawaPluginFunctionalTest {
     @Rule @JvmField
     val tempDir = TemporaryFolder()

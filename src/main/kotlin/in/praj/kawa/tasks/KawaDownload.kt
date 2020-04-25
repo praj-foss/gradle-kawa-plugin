@@ -37,7 +37,7 @@ abstract class KawaDownload : DefaultTask() {
         val out = outFile.get().asFile
         val tmp = out.resolveSibling("${out.name}.part")
 
-        logger.debug("Downloading Kawa sources from {}", url)
+        logger.lifecycle("Downloading Kawa sources from {}", url)
         URL(url).openStream().use {
             Files.copy(it, tmp.toPath(), StandardCopyOption.REPLACE_EXISTING)
         }
