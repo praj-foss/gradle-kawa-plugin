@@ -8,4 +8,5 @@ package `in`.praj.kawa
 /**
  * A simple unit test for the 'in.praj.kawa' plugin.
  */
+// TODO: Fill these
 class KawaPluginTest

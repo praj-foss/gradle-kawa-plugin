@@ -5,27 +5,33 @@
 
 package `in`.praj.kawa
 
-import org.gradle.api.Project
 import org.gradle.api.Plugin
+import org.gradle.api.Project
 
 /**
- * Plugin to set up Kawa Scheme projects.
+ * Plugin to setup Kawa projects and apply default configurations.
  */
-class KawaPlugin: Plugin<Project> {
-    lateinit var project: Project
+class KawaPlugin : Plugin<Project> {
+    private lateinit var project: Project
+    private lateinit var basePlugin: KawaBasePlugin
 
     override fun apply(project: Project) {
         this.project = project
+        basePlugin = project.plugins.apply(KawaBasePlugin::class.java)
 
         configureExtensions()
-        configureTasks()
     }
 
     private fun configureExtensions() {
-        project.extensions.create("kawa", KawaExtension::class.java, project)
-    }
+        basePlugin.kawaExtension.apply {
+            cacheDir = project.buildDir.resolve("kawaCache")
+        }
 
-    private fun configureTasks() {
-        project.tasks.create("downloadToolsKawa", KawaDownloadTools::class.java)
+        basePlugin.kawacExtension.apply {
+            srcDir   = project.projectDir.resolve("src")
+            destDir  = project.buildDir.resolve("kawaClasses")
+            language = "scheme"
+            args     = "--warn-as-error"
+        }
     }
 }

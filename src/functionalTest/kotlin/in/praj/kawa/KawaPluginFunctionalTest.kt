@@ -11,11 +11,11 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import java.io.File
-import kotlin.test.assertTrue
 
 /**
  * A simple functional test for the 'in.praj.kawa' plugin.
  */
+// TODO: Fill these
 class KawaPluginFunctionalTest {
     @Rule @JvmField
     val tempDir = TemporaryFolder()
@@ -26,8 +26,8 @@ class KawaPluginFunctionalTest {
     @Before
     fun setup() {
         projectDir = tempDir.newFolder()
-        settingsFile = projectDir.resolve("settings.gradle.kts")
-        buildFile = projectDir.resolve("build.gradle.kts")
+        settingsFile = projectDir.resolve("settings.gradle")
+        buildFile = projectDir.resolve("build.gradle")
     }
 
     @Test
@@ -38,11 +38,11 @@ class KawaPluginFunctionalTest {
 
         buildFile.writeText("""
             plugins {
-              id("in.praj.kawa")
+              id "in.praj.kawa"
             }
             
             kawa {
-              version.set("3.2.1")
+              version = "1.10"
             }
         """.trimIndent())
 
@@ -52,6 +52,6 @@ class KawaPluginFunctionalTest {
                 .withArguments("downloadToolsKawa")
                 .withProjectDir(projectDir)
                 .build()
-        assertTrue(result.output.contains("Downloading version 3.2.1"))
+        assert(result.output.contains("Downloaded kawa-1.10.tar.gz"))
     }
 }
